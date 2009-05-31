@@ -116,8 +116,10 @@ def already_downloaded(item,xmlFilePath):
     return False
 
 def parse_url(url):
+    print url
     matches = re.findall("[0-9]{2,}",url)
-    return matches[0]
+    for match in matches:
+        return match
     
 def main():
     
