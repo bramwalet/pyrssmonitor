@@ -28,7 +28,8 @@ def parseFeed(url,tag):
         items = []
         feed = feedparser.parse(url)
         for feeditem in feed["items"]:
-            items.append(feeditem[tag])
+            foundItem = feeditem[tag]
+            items.append(foundItem)
            
         return items
     
