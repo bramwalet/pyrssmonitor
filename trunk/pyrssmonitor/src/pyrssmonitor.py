@@ -28,7 +28,6 @@ def parseFeed(url,tag):
         print "Parsing feed "+ url+ " for tag " + tag
         items = []
         feed = feedparser.parse(url)
-        print feed.namespaces
         for feeditem in feed.entries:
             if tag == "title":
                 foundItem = feeditem.title
@@ -38,7 +37,6 @@ def parseFeed(url,tag):
                 if len(matches)>0:
                     foundItem = matches[0]
                     
-            print foundItem
             items.append(foundItem)
            
         return items
