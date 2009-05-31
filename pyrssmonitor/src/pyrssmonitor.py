@@ -24,6 +24,7 @@ import os.path
 import simplexml 
 
 def parseFeed(url,tag):
+        print "Parsing feed "+ url+ " for tag " + tag
         items = []
         feed = feedparser.parse(url)
         for feeditem in feed["items"]:
