@@ -32,7 +32,7 @@ def parseFeed(url,tag):
         return items
     
 def search_newzbin(item):
-    
+    print "Search newzbin for: "+item
     baseUrl = "http://v3.newzbin.com/search/query/?"
     searchKeys = {"q":item,
                   "searchaction":"Search",
@@ -59,6 +59,7 @@ def search_newzbin(item):
           
 
 def enqueue_sabznbd(downloadItem):
+    print "Enqueue sabnzbd for: "+ downloadItem
     sabnzbd_host = "http://192.168.16.20:9200/sabnzbd/"
     # sabnzbd_user = ""
     # sabnzbd_pass = "" 
@@ -78,10 +79,6 @@ def enqueue_sabznbd(downloadItem):
         print "Problem while trying to enqueue newzbin postId: " + downloadItem
         return False
 
-def read_downloaded(xmlFilePath):
-    doc = simplexml.xmldoc()
-    doc.load(xmlFilePath)
-
 
 def save_downloaded(xmlFilePath,enqueuedItems):
     if os.path.exists(xmlFilePath):
@@ -100,7 +97,7 @@ def save_downloaded(xmlFilePath,enqueuedItems):
     
     
 def already_downloaded(item,xmlFilePath):
-
+    print "Check if "+item+" is already downloaded"
     if os.path.exists(xmlFilePath):
         filename = xmlFilePath
     else: 
@@ -110,8 +107,9 @@ def already_downloaded(item,xmlFilePath):
     elements = doc.elements("items/item/title")
     for element in elements:
         if element.value == item:
+            print "Already in "+ xmlFilePath + " so skipping this item"
             return True
-    
+    print "Not found, so search & enqueue"
     return False
     
 def main():
