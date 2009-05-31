@@ -3,13 +3,20 @@ Created on 31 mei 2009
 
 @author: Bram Walet
 '''
-import feedparser, urllib
 
-def parseFeed(url):
+import feedparser, urllib
+import os.path
+import simplexml 
+#from xml.etree.ElementTree import ElementTree, SubElement
+
+
+
+
+def parseFeed(url,tag):
         items = []
         feed = feedparser.parse(url)
         for feeditem in feed["items"]:
-            items.append(feeditem["title"])
+            items.append(feeditem[tag])
            
         return items
     
@@ -36,42 +43,84 @@ def search_newzbin(item):
                   }
     searchQueryUrl = baseUrl + urllib.urlencode(searchKeys)
     print searchQueryUrl
-    feed = feedparser.parse(searchQueryUrl)
-    for feeditem in feed["items"]:
-        if feeditem["report_id"] is not None:
-            return feeditem["report_id"]
+    items = parseFeed(searchQueryUrl,"report_id")
+    if items is not None and len(items)>0:
+        return items[0]
+    
+          
 
 def enqueue_sabznbd(downloadItem):
+    downloaded = []
     sabnzbd_host = "http://192.168.16.20:9200/sabnzbd/"
-    sabnzbd_user = ""
-    sabnzbd_pass = "" 
+  #  sabnzbd_user = ""
+  #  sabnzbd_pass = "" 
     sabnzbd_apikey = "d024408218ef9728d99ffe0a1d1f33d6" 
     sabnzbdkeys = {"mode":"addid",
                    "name":downloadItem,
-#                   "ma_username":sabnzbd_user,
-#                   "ma_password":sabnzbd_pass,
-                   "cat":"\"movies\"",
+   #                "ma_username":sabnzbd_user,
+   #                "ma_password":sabnzbd_pass,
                    "apikey":sabnzbd_apikey}
     enqueueUrl = sabnzbd_host + "api?" + urllib.urlencode(sabnzbdkeys)
     print enqueueUrl
-    response = urllib.urlopen(enqueueUrl)
+    #response = urllib.urlopen(enqueueUrl)
+    return True
     if response.read() == "ok\n":
         print "Enqueued newzbin postId: " + downloadItem
+        return True
     else:
-        print response.read()
+        print "Problem while trying to enqueue newzbin postId: " + downloadItem
+        return False
 
+def read_downloaded(xmlFilePath):
+    doc = simplexml.xmldoc()
+    doc.load(xmlFilePath)
+
+
+def save_downloaded(xmlFilePath,enqueuedItems):
+    if os.path.exists(xmlFilePath):
+        filename = xmlFilePath
+    else: 
+        filename = None
+    doc = simplexml.xmldoc(filename)
+    if doc is None or doc.root is None:
+        doc.new_root("items")       
+    elements = doc.elements("items")
+    for item in enqueuedItems:
+        xmlItem = elements[0].newchild("item")
+        titleItem = xmlItem.newchild("title")
+        titleItem.value = item 
+    doc.save(xmlFilePath)
+    
+    
+def already_downloaded(item,xmlFilePath):
+
+    if os.path.exists(xmlFilePath):
+        filename = xmlFilePath
+    else: 
+        filename = None
+        return False
+    doc = simplexml.xmldoc(filename)
+    elements = doc.elements("items/item/title")
+    for element in elements:
+        if element.value == item:
+            return True
+    
+    return False
+    
 def main():
-    downloadList = []
+    
+    xmlFilePath = "downloadlist.xml"
+    #read_downloaded(xmlFilePath)
+    enqueuedItems = []
     rssfeed = "http://rss.imdb.com/mymovies/list?l=29166270"
-    items = parseFeed(rssfeed)
+    items = parseFeed(rssfeed,"title")
     for item in items:
-        results = search_newzbin(item)
-        if results is not None:
-            downloadList.append(results)
-    if len(downloadList) > 0:
-        for downloadItem in downloadList:
-            enqueue_sabznbd(downloadItem)
-        
+        if not already_downloaded(item,xmlFilePath):
+            result = search_newzbin(item)
+            if result is not None:
+                if enqueue_sabznbd(result) is True:
+                    enqueuedItems.append(item)
+    save_downloaded(xmlFilePath,enqueuedItems)
 if __name__ == '__main__':
     main()
     
