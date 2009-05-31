@@ -55,7 +55,7 @@ def search_newzbin(item):
                   "feed":"rss",
                   }
     searchQueryUrl = baseUrl + urllib.urlencode(searchKeys)
-    items = parseFeed(searchQueryUrl,"link")
+    items = parseFeed(searchQueryUrl,"id")
     if items is not None and len(items)>0:
         return items[0]
     
@@ -115,12 +115,6 @@ def already_downloaded(item,xmlFilePath):
     print "Not found, so search & enqueue"
     return False
 
-def parse_url(url):
-    print url
-    matches = re.findall("[0-9]{2,}",url)
-    for match in matches:
-        return match
-    
 def main():
     
     xmlFilePath = "downloadlist.xml"
@@ -132,8 +126,7 @@ def main():
         if not already_downloaded(item,xmlFilePath):
             result = search_newzbin(item)
             if result is not None:
-                id = parse_url(result)
-                if enqueue_sabznbd(id) is True:
+                if enqueue_sabznbd(result) is True:
                     enqueuedItems.append(item)
     save_downloaded(xmlFilePath,enqueuedItems)
 if __name__ == '__main__':
