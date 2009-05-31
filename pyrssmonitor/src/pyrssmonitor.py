@@ -17,12 +17,10 @@ You should have received a copy of the GNU General Public License
 along with PyRssMonitor.  If not, see <http://www.gnu.org/licenses/>.
 
 @author: Bram Walet
-'''
-import re
 
-import feedparser, urllib
-import os.path
-import simplexml 
+'''
+import ConfigParser, feedparser,os.path, re,simplexml , urllib
+
 
 def parseFeed(url,tag):
         print "Parsing feed "+ url+ " for tag " + tag
@@ -33,6 +31,7 @@ def parseFeed(url,tag):
                 foundItem = feeditem.title
             if tag == "link":
                 foundItem = feeditem.guid
+                # looking for an identifier with at least 2 numbers in the GUID url.
                 matches = re.findall("[0-9]{2,}", foundItem)
                 if len(matches)>0:
                     foundItem = matches[0]
@@ -68,25 +67,24 @@ def search_newzbin(item):
     
           
 
-def enqueue_sabznbd(downloadItem):
-    print "Enqueue sabnzbd for: "+ downloadItem
-    sabnzbd_host = "http://192.168.16.20:9200/sabnzbd/"
-    # sabnzbd_user = ""
-    # sabnzbd_pass = "" 
-    sabnzbd_apikey = "d024408218ef9728d99ffe0a1d1f33d6" 
+def enqueue_sabznbd(downloadItem,sabnzbd_host,sabnzbd_port,sabnzbd_user,sabnzbd_pass,sabnzbd_apikey):
+    #print "Enqueue sabnzbd for: "+ downloadItem
     sabnzbdkeys = {"mode":"addid",
                    "name":downloadItem,
-   #                "ma_username":sabnzbd_user,
-   #                "ma_password":sabnzbd_pass,
                    "apikey":sabnzbd_apikey}
-    enqueueUrl = sabnzbd_host + "api?" + urllib.urlencode(sabnzbdkeys)
+    if sabnzbd_user is not None and sabnzbd_pass is not None:
+        authentication = {"ma_username":sabnzbd_user,"ma_password":sabnzbd_pass}
+    enqueueUrl = "http://" + sabnzbd_host + ":" + sabnzbd_port + "/sabnzbd/api?" + urllib.urlencode(sabnzbdkeys)
+    if authentication is not None:
+        enqueueUrl = enqueueUrl + "&" + urllib.urlencode(authentication)
     response = urllib.urlopen(enqueueUrl)
-
-    if response.read() == "ok\n":
-        print "Enqueued newzbin postId: " + downloadItem
+    result = response.read()
+    if result == "ok\n":
+        print "Queued newzbin postId: " + downloadItem
         return True
     else:
         print "Problem while trying to enqueue newzbin postId: " + downloadItem
+        print "Result: "+ result
         return False
 
 
@@ -99,14 +97,15 @@ def save_downloaded(xmlFilePath,enqueuedItems):
     if doc is None or doc.root is None:
         doc.new_root("items")       
     elements = doc.elements("items")
-    for item in enqueuedItems:
+    for (item,feed) in enqueuedItems:
         xmlItem = elements[0].newchild("item")
+        xmlItem.attr("feed", feed)
         titleItem = xmlItem.newchild("title")
         titleItem.value = item 
     doc.save(xmlFilePath)
     
     
-def already_downloaded(item,xmlFilePath):
+def already_downloaded(item,feed,xmlFilePath):
     print "Check if "+item+" is already downloaded"
     if os.path.exists(xmlFilePath):
         filename = xmlFilePath
@@ -114,7 +113,7 @@ def already_downloaded(item,xmlFilePath):
         filename = None
         return False
     doc = simplexml.xmldoc(filename)
-    elements = doc.elements("items/item/title")
+    elements = doc.elements("items/item(feed="+feed+")/title")
     for element in elements:
         if element.value == item:
             print "Already in "+ xmlFilePath + " so skipping this item"
@@ -122,21 +121,45 @@ def already_downloaded(item,xmlFilePath):
     print "Not found, so search & enqueue"
     return False
 
-def main():
+def get_config_sabnzbd(config):
+    host = config.get('sabnzbd', 'host')
+    port = config.get('sabnzbd', 'port')
+    username = config.get('sabnzbd', 'username')
+    password = config.get('sabnzbd', 'password')
+    apikey = config.get('sabnzbd', 'apikey')
+    return host,port,username,password,apikey
+
+def get_config_global(config):
+    config.read('pyrssmonitor.cfg')
+    if not config.has_section('pyrssmonitor'):
+        raise Exception("configuration file section %1 missing", "pyrssmonitor")
     
-    xmlFilePath = "downloadlist.xml"
-    #read_downloaded(xmlFilePath)
+    if not config.has_section('sabnzbd'):
+        raise Exception("configuration file section %1 missing", "sabnzbd")
+    
+    xmlFilePath = config.get('pyrssmonitor', 'xmlfile')
+ 
+    return xmlFilePath
+def main():
+    config = ConfigParser.RawConfigParser()
+    xmlFilePath = get_config_global(config)
+    rssfeeds = config.items('rssfeeds')
+    (sab_host , sab_port , sab_user , sab_pass , sab_apikey) = get_config_sabnzbd(config)
+    
     enqueuedItems = []
-    rssfeed = "http://rss.imdb.com/mymovies/list?l=29166270"
-    items = parseFeed(rssfeed,"title")
-    for item in items:
-        if not already_downloaded(item,xmlFilePath):
-            result = search_newzbin(item)
-            if result is not None:
-                if enqueue_sabznbd(result) is True:
-                    enqueuedItems.append(item)
+    for (rssfeedname,rssfeedurl) in rssfeeds:
+        items = parseFeed(rssfeedurl,"title")
+        for item in items:
+            if not already_downloaded(item,rssfeedname,xmlFilePath):
+                result = search_newzbin(item)
+                if result is not None:
+                    if enqueue_sabznbd(result,sab_host,sab_port,sab_user,sab_pass,sab_apikey) is True:
+                        enqueuedItem = (item,rssfeedname)
+                        enqueuedItems.append(enqueuedItem)
     save_downloaded(xmlFilePath,enqueuedItems)
 if __name__ == '__main__':
     main()
+
+
     
 
