@@ -23,9 +23,6 @@ import feedparser, urllib
 import os.path
 import simplexml 
 
-
-
-
 def parseFeed(url,tag):
         items = []
         feed = feedparser.parse(url)
@@ -36,7 +33,6 @@ def parseFeed(url,tag):
     
 def search_newzbin(item):
     
-    # http://v3.newzbin.com/search/query/?q=300+(2006)
     baseUrl = "http://v3.newzbin.com/search/query/?"
     searchKeys = {"q":item,
                   "searchaction":"Search",
@@ -56,7 +52,6 @@ def search_newzbin(item):
                   "feed":"rss",
                   }
     searchQueryUrl = baseUrl + urllib.urlencode(searchKeys)
-    print searchQueryUrl
     items = parseFeed(searchQueryUrl,"report_id")
     if items is not None and len(items)>0:
         return items[0]
@@ -64,10 +59,9 @@ def search_newzbin(item):
           
 
 def enqueue_sabznbd(downloadItem):
-    downloaded = []
     sabnzbd_host = "http://192.168.16.20:9200/sabnzbd/"
-  #  sabnzbd_user = ""
-  #  sabnzbd_pass = "" 
+    # sabnzbd_user = ""
+    # sabnzbd_pass = "" 
     sabnzbd_apikey = "d024408218ef9728d99ffe0a1d1f33d6" 
     sabnzbdkeys = {"mode":"addid",
                    "name":downloadItem,
@@ -75,9 +69,8 @@ def enqueue_sabznbd(downloadItem):
    #                "ma_password":sabnzbd_pass,
                    "apikey":sabnzbd_apikey}
     enqueueUrl = sabnzbd_host + "api?" + urllib.urlencode(sabnzbdkeys)
-    print enqueueUrl
-    #response = urllib.urlopen(enqueueUrl)
-    return True
+    response = urllib.urlopen(enqueueUrl)
+
     if response.read() == "ok\n":
         print "Enqueued newzbin postId: " + downloadItem
         return True
