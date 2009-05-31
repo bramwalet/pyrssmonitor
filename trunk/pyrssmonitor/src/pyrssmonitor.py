@@ -33,7 +33,7 @@ def parseFeed(url,tag):
             if tag == "title":
                 foundItem = feeditem.title
             if tag == "link":
-                foundItem = feeditem.link
+                foundItem = feeditem.guid
                 matches = re.findall("[0-9]{2,}", foundItem)
                 if len(matches)>0:
                     foundItem = matches[0]
