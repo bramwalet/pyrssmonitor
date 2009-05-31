@@ -22,14 +22,18 @@ along with PyRssMonitor.  If not, see <http://www.gnu.org/licenses/>.
 import feedparser, urllib
 import os.path
 import simplexml 
-import re
 
 def parseFeed(url,tag):
         print "Parsing feed "+ url+ " for tag " + tag
         items = []
         feed = feedparser.parse(url)
-        for feeditem in feed["items"]:
-            foundItem = feeditem[tag]
+        print feed.namespaces
+        for feeditem in feed.entries:
+            if tag == "title":
+                foundItem = feeditem.title
+            if tag == "report_id":
+                foundItem = feeditem.report_id
+            print foundItem
             items.append(foundItem)
            
         return items
@@ -55,7 +59,7 @@ def search_newzbin(item):
                   "feed":"rss",
                   }
     searchQueryUrl = baseUrl + urllib.urlencode(searchKeys)
-    items = parseFeed(searchQueryUrl,"id")
+    items = parseFeed(searchQueryUrl,"report_id")
     if items is not None and len(items)>0:
         return items[0]
     
