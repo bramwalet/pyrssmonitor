@@ -22,6 +22,7 @@ along with PyRssMonitor.  If not, see <http://www.gnu.org/licenses/>.
 import feedparser, urllib
 import os.path
 import simplexml 
+import re
 
 def parseFeed(url,tag):
         print "Parsing feed "+ url+ " for tag " + tag
@@ -54,7 +55,7 @@ def search_newzbin(item):
                   "feed":"rss",
                   }
     searchQueryUrl = baseUrl + urllib.urlencode(searchKeys)
-    items = parseFeed(searchQueryUrl,"report_id")
+    items = parseFeed(searchQueryUrl,"link")
     if items is not None and len(items)>0:
         return items[0]
     
@@ -113,6 +114,10 @@ def already_downloaded(item,xmlFilePath):
             return True
     print "Not found, so search & enqueue"
     return False
+
+def parse_url(url):
+    matches = re.findall("[0-9]{2,}",url)
+    return matches[0]
     
 def main():
     
@@ -125,7 +130,8 @@ def main():
         if not already_downloaded(item,xmlFilePath):
             result = search_newzbin(item)
             if result is not None:
-                if enqueue_sabznbd(result) is True:
+                id = parse_url(result)
+                if enqueue_sabznbd(id) is True:
                     enqueuedItems.append(item)
     save_downloaded(xmlFilePath,enqueuedItems)
 if __name__ == '__main__':
