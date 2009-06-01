@@ -45,28 +45,34 @@ def parseFeed(url,tag):
         # return the list of items in the feed.   
         return items
     
-def search_newzbin(item):
+def search_newzbin(item,extraKeys):
     print "Search newzbin for: "+item
     baseUrl = "http://v3.newzbin.com/search/query/?"
     # these keys will generate the search query. See the HTML form on newzbin on information.
-    searchKeys = {"q":item,
+    searchKeys = {"q":"\""+item+"\"",
                   "searchaction":"Search",
                   "fpn":"p",
-                  "category":"-1",
+             #     "category":"-1",
                   "u_nfo_posts_only":"0",
                   "u_url_posts_only":"0",
                   "u_comment_posts_only":"0",
                   "u_v3_retention":"20736000",
-                  "ps_rb_region":"1073741824",
-                  "ps_rb_source":"64",
-                  "ps_rb_video_format":"2",
-                  "ps_rb_language":"4096",
+             #     "ps_rb_region":"1073741824",
+             #     "ps_rb_source":"64",
+             #     "ps_rb_video_format":"2",
+             #     "ps_rb_language":"4096",
                   "sort":"ps_edit_date",
                   "order":"desc",
                   "u_post_results_amt":"10",
                   "feed":"rss",
                   }
-    searchQueryUrl = baseUrl + urllib.urlencode(searchKeys)
+        
+    queryParams = {}
+    queryParams.update(searchKeys) 
+    queryParams.update(extraKeys) 
+    
+    searchQueryUrl = baseUrl + urllib.urlencode(queryParams)
+    
     # newzbin can output the search query as RSS so we need feedparser here too!
     items = parseFeed(searchQueryUrl,"link")
     if items is not None and len(items)>0:
@@ -74,24 +80,22 @@ def search_newzbin(item):
     
           
 
-def enqueue_sabznbd(downloadItem,sabnzbd_host,sabnzbd_port,sabnzbd_user,sabnzbd_pass,sabnzbd_apikey):
+def queue_sabznbd(downloadItem,sabnzbd_host,sabnzbd_port,sabnzbd_user,sabnzbd_pass,sabnzbd_apikey):
     #print "Enqueue sabnzbd for: "+ downloadItem
+    queryParams = {}
     sabnzbdkeys = {"mode":"addid",
                    "name":downloadItem,
                    "apikey":sabnzbd_apikey}
+    queryParams.update(sabnzbdkeys)
+    
     # check if we need authentication
-    if sabnzbd_user is not None and sabnzbd_pass is not None:
+    if not sabnzbd_user and len(sabnzbd_user) > 0  and not sabnzbd_pass and len(sabnzbd_pass) > 0:
         authentication = {"ma_username":sabnzbd_user,"ma_password":sabnzbd_pass}
-    
-    # basic queue URL for sabnzbd    
-    enqueueUrl = "http://" + sabnzbd_host + ":" + sabnzbd_port + "/sabnzbd/api?" + urllib.urlencode(sabnzbdkeys)
-    
-    # some extra parts if authentication is needed
-    if authentication is not None:
-        enqueueUrl = enqueueUrl + "&" + urllib.urlencode(authentication)
-        
+        queryParams.update(authentication)
+            
+    queueUrl = "http://" + sabnzbd_host + ":" + sabnzbd_port + "/sabnzbd/api?" + urllib.urlencode(queryParams)
     # open the URL so the item gets queued        
-    response = urllib.urlopen(enqueueUrl)
+    response = urllib.urlopen(queueUrl)
     result = response.read()
     
     # check if queue was succesful.
@@ -99,12 +103,12 @@ def enqueue_sabznbd(downloadItem,sabnzbd_host,sabnzbd_port,sabnzbd_user,sabnzbd_
         print "Queued newzbin postId: " + downloadItem
         return True
     else:
-        print "Problem while trying to enqueue newzbin postId: " + downloadItem
+        print "Problem while trying to queue newzbin postId: " + downloadItem
         print "Result: "+ result
         return False
 
 
-def save_downloaded(xmlFilePath,enqueuedItems):
+def save_downloaded(xmlFilePath,queuedItems):
     # before we read the file, check if it exists. 
     if os.path.exists(xmlFilePath):
         filename = xmlFilePath
@@ -118,13 +122,12 @@ def save_downloaded(xmlFilePath,enqueuedItems):
     elements = doc.elements("items")
     
     # for each item in enqueuedelements we need to store that it is downloaded
-    for (item,feed) in enqueuedItems:
+    for (item,feed) in queuedItems:
         # each element 'item' in the XML has an attribute 'feed'
         # and each element 'item' has a child named 'title'.
         xmlItem = elements[0].newchild("item")
         xmlItem.attr("feed", feed)
-        titleItem = xmlItem.newchild("title")
-        titleItem.value = item 
+        xmlItem.value = item
     doc.save(xmlFilePath)
     
     
@@ -138,9 +141,9 @@ def already_downloaded(item,feed,xmlFilePath):
         return False
     doc = simplexml.xmldoc(filename)
     # search for item elements in items from a specific feed. Return all title elements.
-    elements = doc.elements("items/item(feed=" + feed + ")/title")
+    elements = doc.elements("items/item(feed=" + feed + ")")
     for element in elements:
-        # check if the element ('title') matches the item we are inspecting.
+        # check if the element matches the item we are inspecting.
         if element.value == item:
             print "Already in "+ xmlFilePath + " so skipping this item"
             return True
@@ -175,6 +178,11 @@ def get_config_global(config):
     # feedname = feedurl
     rssfeeds = config.items('rssfeeds')
     return xmlFilePath,rssfeeds
+
+def get_feed_newzbin_params(rssfeedname,config):
+    if config.has_section(rssfeedname):
+        return config.items(rssfeedname)
+    
 def main():
     config = ConfigParser.RawConfigParser()
     
@@ -182,9 +190,10 @@ def main():
     (xmlFilePath,rssfeeds) = get_config_global(config)
     (sab_host , sab_port , sab_user , sab_pass , sab_apikey) = get_config_sabnzbd(config)
     
-    enqueuedItems = []
+    queuedItems = []
     # for each rssfeed
     for (rssfeedname,rssfeedurl) in rssfeeds:
+        extraKeys = get_feed_newzbin_params(rssfeedname,config)
         # parse the feed
         items = parseFeed(rssfeedurl,"title")
         # for each item in the rss feed
@@ -192,16 +201,16 @@ def main():
             # check if we downloaded this title
             if not already_downloaded(item,rssfeedname,xmlFilePath):
                 # if we haven't downloaded it, search it on newzbin.
-                result = search_newzbin(item)
+                result = search_newzbin(item,extraKeys)
                 if result is not None:
                     # if we have a result, queue it in sabnzbd
-                    if enqueue_sabznbd(result,sab_host,sab_port,sab_user,sab_pass,sab_apikey) is True:
-                        enqueuedItem = (item,rssfeedname)
+                    if queue_sabznbd(result,sab_host,sab_port,sab_user,sab_pass,sab_apikey) is True:
+                        queuedItem = (item,rssfeedname)
                         # append it to the list with queued items, so we can store it in the xml file
-                        enqueuedItems.append(enqueuedItem)
+                        queuedItems.append(queuedItem)
     
     # store all downloaded items in the xml file                    
-    save_downloaded(xmlFilePath,enqueuedItems)
+    save_downloaded(xmlFilePath,queuedItems)
     
 # main shit
 if __name__ == '__main__':
