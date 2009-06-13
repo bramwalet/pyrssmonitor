@@ -163,13 +163,13 @@ def get_config_global(config):
     config.read('pyrssmonitor.cfg')
     # check if sections exist.
     if not config.has_section('pyrssmonitor'):
-        raise Exception("configuration file section %1 missing", "pyrssmonitor")
+        raise Exception("configuration file section pyrssmonitor missing")
     
     if not config.has_section('sabnzbd'):
-        raise Exception("configuration file section %1 missing", "sabnzbd")
+        raise Exception("configuration file section sabnzbd missing")
     
     if not config.has_section('rssfeeds'):
-        raise Exception("configuration file section %1 missing", "ressfeeds")
+        raise Exception("configuration file section ressfeeds missing")
     
     # this config item tells us where to find the xml file.
     xmlFilePath = config.get('pyrssmonitor', 'xmlfile')
