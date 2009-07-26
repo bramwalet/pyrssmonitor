@@ -23,7 +23,7 @@ import ConfigParser, feedparser,os.path, re,simplexml , urllib
 
 
 def parseFeed(url,tag):
-    print "Parsing feed "+ url+ " for tag " + tag
+    #print "Parsing feed "+ url+ " for tag " + tag
     items = []
     feed = feedparser.parse(url)
     # for each entry in the feed,
