@@ -23,31 +23,31 @@ import ConfigParser, feedparser,os.path, re,simplexml , urllib
 
 
 def parseFeed(url,tag):
-        print "Parsing feed "+ url+ " for tag " + tag
-        items = []
-        feed = feedparser.parse(url)
-        # for each entry in the feed,
-        for feeditem in feed.entries:
-            # if we are looking for a title (in the rss feeds in the config)
-            if tag == "title":
-                foundItem = feeditem.title
-            # specific for the newzbin feed, because we need a postId to queue sabnzbd
-            if tag == "link":
-                foundItem = feeditem.guid
-                # looking for an identifier with at least 2 numbers in the GUID url.
-                matches = re.findall("[0-9]{2,}", foundItem)
-                if len(matches)>0:
-                    foundItem = matches[0]
-                    
-            # add the found item to the list        
-            items.append(foundItem)
-            
-        # return the list of items in the feed.   
-        return items
+    print "Parsing feed "+ url+ " for tag " + tag
+    items = []
+    feed = feedparser.parse(url)
+    # for each entry in the feed,
+    for feeditem in feed.entries:
+        # if we are looking for a title (in the rss feeds in the config)
+        if tag == "title":
+            foundItem = feeditem.title
+        # specific for the newzbin feed, because we need a postId to queue sabnzbd
+        if tag == "link":
+            foundItem = feeditem.guid
+            # looking for an identifier with at least 2 numbers in the GUID url.
+            matches = re.findall("[0-9]{2,}", foundItem)
+            if len(matches)>0:
+                foundItem = matches[0]
+                
+        # add the found item to the list        
+        items.append(foundItem)
+        
+    # return the list of items in the feed.   
+    return items
     
-def search_newzbin(item,extraKeys):
+def search_newzbin(item,extraKeys,newzbin_user,newzbin_pass):
     print "Search newzbin for: "+item
-    baseUrl = "http://v3.newzbin.com/search/query/?"
+    baseUrl = "http://"+newzbin_user+":"+newzbin_pass+"@v3.newzbin.com/search/query/?"
     # these keys will generate the search query. See the HTML form on newzbin on information.
     searchKeys = {"q":"\""+item+"\"",
                   "searchaction":"Search",
@@ -116,7 +116,7 @@ def save_downloaded(xmlFilePath,queuedItems):
         filename = None
     doc = simplexml.xmldoc(filename)
     # create new file and new root if file does not exists.
-    if doc is None or doc.root is None:
+    if doc is None: #or doc.root is None:
         doc.new_root("items")       
     # items is the root element
     elements = doc.elements("items")
@@ -158,6 +158,11 @@ def get_config_sabnzbd(config):
     apikey = config.get('sabnzbd', 'apikey')
     return host,port,username,password,apikey
 
+def get_config_newzbin(config):
+    username = config.get('newzbin', 'username')
+    password = config.get('newzbin', 'password')
+    return username,password
+
 def get_config_global(config):
     # read config file
     config.read('pyrssmonitor.cfg')
@@ -189,6 +194,7 @@ def main():
     # get config variables
     (xmlFilePath,rssfeeds) = get_config_global(config)
     (sab_host , sab_port , sab_user , sab_pass , sab_apikey) = get_config_sabnzbd(config)
+    (newzbin_user, newzbin_pass) = get_config_newzbin(config)
     
     queuedItems = []
     # for each rssfeed
@@ -201,7 +207,7 @@ def main():
             # check if we downloaded this title
             if not already_downloaded(item,rssfeedname,xmlFilePath):
                 # if we haven't downloaded it, search it on newzbin.
-                result = search_newzbin(item,extraKeys)
+                result = search_newzbin(item,extraKeys,newzbin_user, newzbin_pass)
                 if result is not None:
                     # if we have a result, queue it in sabnzbd
                     if queue_sabznbd(result,sab_host,sab_port,sab_user,sab_pass,sab_apikey) is True:
